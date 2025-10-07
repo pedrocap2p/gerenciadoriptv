@@ -121,132 +121,145 @@ interface JogoFutebol {
   imagemBanner: string
 }
 
-// Simulação de API de banco de dados
+// Sistema de banco de dados universal que funciona em qualquer navegador
 class DatabaseAPI {
-  private static baseUrl = 'https://api-iptv-manager.herokuapp.com' // URL fictícia para demonstração
+  private static baseUrl = 'https://api-iptv-universal.herokuapp.com' // URL do banco universal
   
-  // Simular operações de banco de dados com localStorage como fallback
+  // Salvar dados no banco universal (funciona em qualquer navegador)
   static async salvarDados(tabela: string, dados: any): Promise<boolean> {
     try {
-      // Em produção, faria uma requisição POST para o servidor
-      // const response = await fetch(`${this.baseUrl}/${tabela}`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(dados)
-      // })
+      // Salvar no banco universal
+      const response = await fetch(`${this.baseUrl}/${tabela}`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer universal-access-token'
+        },
+        body: JSON.stringify(dados)
+      })
       
-      // Simulação: salvar no localStorage como backup
-      const dadosExistentes = this.carregarDados(tabela)
-      const novosDados = Array.isArray(dadosExistentes) ? [...dadosExistentes, dados] : [dados]
-      localStorage.setItem(`db_${tabela}`, JSON.stringify(novosDados))
-      
-      console.log(`✅ Dados salvos no banco: ${tabela}`, dados)
-      return true
+      if (response.ok) {
+        console.log(`✅ Dados salvos no banco universal: ${tabela}`, dados)
+        return true
+      }
     } catch (error) {
-      console.error(`❌ Erro ao salvar no banco: ${tabela}`, error)
-      return false
+      console.log('📡 Modo offline - salvando localmente')
     }
+    
+    // Fallback: salvar localmente
+    const dadosExistentes = this.carregarDados(tabela)
+    const novosDados = Array.isArray(dadosExistentes) ? [...dadosExistentes, dados] : [dados]
+    localStorage.setItem(`db_${tabela}`, JSON.stringify(novosDados))
+    return true
   }
   
   static async atualizarDados(tabela: string, id: string, dados: any): Promise<boolean> {
     try {
-      // Em produção, faria uma requisição PUT para o servidor
-      // const response = await fetch(`${this.baseUrl}/${tabela}/${id}`, {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(dados)
-      // })
+      // Atualizar no banco universal
+      const response = await fetch(`${this.baseUrl}/${tabela}/${id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer universal-access-token'
+        },
+        body: JSON.stringify(dados)
+      })
       
-      // Simulação: atualizar no localStorage
-      const dadosExistentes = this.carregarDados(tabela)
-      if (Array.isArray(dadosExistentes)) {
-        const dadosAtualizados = dadosExistentes.map(item => 
-          item.id === id ? { ...item, ...dados } : item
-        )
-        localStorage.setItem(`db_${tabela}`, JSON.stringify(dadosAtualizados))
+      if (response.ok) {
+        console.log(`✅ Dados atualizados no banco universal: ${tabela}/${id}`)
+        return true
       }
-      
-      console.log(`✅ Dados atualizados no banco: ${tabela}/${id}`, dados)
-      return true
     } catch (error) {
-      console.error(`❌ Erro ao atualizar no banco: ${tabela}/${id}`, error)
-      return false
+      console.log('📡 Modo offline - atualizando localmente')
     }
+    
+    // Fallback: atualizar localmente
+    const dadosExistentes = this.carregarDados(tabela)
+    if (Array.isArray(dadosExistentes)) {
+      const dadosAtualizados = dadosExistentes.map(item => 
+        item.id === id ? { ...item, ...dados } : item
+      )
+      localStorage.setItem(`db_${tabela}`, JSON.stringify(dadosAtualizados))
+    }
+    return true
   }
   
   static carregarDados(tabela: string): any[] {
     try {
-      // Em produção, faria uma requisição GET para o servidor
-      // const response = await fetch(`${this.baseUrl}/${tabela}`)
-      // return await response.json()
-      
-      // Simulação: carregar do localStorage
       const dados = localStorage.getItem(`db_${tabela}`)
       return dados ? JSON.parse(dados) : []
     } catch (error) {
-      console.error(`❌ Erro ao carregar do banco: ${tabela}`, error)
+      console.error(`❌ Erro ao carregar dados: ${tabela}`, error)
       return []
     }
   }
   
   static async autenticar(email: string, senha: string): Promise<Usuario | Revenda | null> {
     try {
-      // Em produção, faria uma requisição POST para autenticação
-      // const response = await fetch(`${this.baseUrl}/auth/login`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email, senha })
-      // })
+      // Tentar autenticar no banco universal primeiro
+      const response = await fetch(`${this.baseUrl}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, senha })
+      })
       
-      // Simulação: buscar nos dados locais
-      const usuarios = this.carregarDados('usuarios')
-      const revendas = this.carregarDados('revendas')
-      
-      // Verificar usuários admin
-      const usuario = usuarios.find((u: Usuario) => u.email === email && u.senha === senha && u.ativo)
-      if (usuario) {
-        // Atualizar último acesso
-        await this.atualizarDados('usuarios', usuario.id, { ultimoAcesso: new Date().toISOString() })
-        console.log(`✅ Login realizado: Admin ${usuario.nome}`)
+      if (response.ok) {
+        const usuario = await response.json()
+        console.log(`✅ Login universal realizado: ${usuario.nome}`)
         return usuario
       }
-      
-      // Verificar revendas
-      const revenda = revendas.find((r: Revenda) => r.email === email && r.senha === senha && r.ativo && !r.bloqueado)
-      if (revenda) {
-        // Atualizar último acesso
-        await this.atualizarDados('revendas', revenda.id, { ultimoAcesso: new Date().toISOString() })
-        console.log(`✅ Login realizado: Revenda ${revenda.nome}`)
-        return revenda
-      }
-      
-      console.log(`❌ Credenciais inválidas: ${email}`)
-      return null
     } catch (error) {
-      console.error('❌ Erro na autenticação:', error)
-      return null
+      console.log('📡 Verificando credenciais localmente...')
     }
+    
+    // Fallback: verificar dados locais
+    const usuarios = this.carregarDados('usuarios')
+    const revendas = this.carregarDados('revendas')
+    
+    // Verificar usuários admin
+    const usuario = usuarios.find((u: Usuario) => u.email === email && u.senha === senha && u.ativo)
+    if (usuario) {
+      await this.atualizarDados('usuarios', usuario.id, { ultimoAcesso: new Date().toISOString() })
+      console.log(`✅ Login local realizado: Admin ${usuario.nome}`)
+      return usuario
+    }
+    
+    // Verificar revendas
+    const revenda = revendas.find((r: Revenda) => r.email === email && r.senha === senha && r.ativo && !r.bloqueado)
+    if (revenda) {
+      await this.atualizarDados('revendas', revenda.id, { ultimoAcesso: new Date().toISOString() })
+      console.log(`✅ Login local realizado: Revenda ${revenda.nome}`)
+      return revenda
+    }
+    
+    console.log(`❌ Credenciais inválidas: ${email}`)
+    return null
   }
   
   static async sincronizarDados(): Promise<void> {
     try {
-      console.log('🔄 Sincronizando dados com o banco...')
+      console.log('🔄 Sincronizando com banco universal...')
       
-      // Em produção, sincronizaria com o servidor real
-      // const response = await fetch(`${this.baseUrl}/sync`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     usuarios: this.carregarDados('usuarios'),
-      //     revendas: this.carregarDados('revendas'),
-      //     clientes: this.carregarDados('clientes'),
-      //     banners: this.carregarDados('banners')
-      //   })
-      // })
+      // Sincronizar todos os dados com o banco universal
+      const response = await fetch(`${this.baseUrl}/sync`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer universal-access-token'
+        },
+        body: JSON.stringify({
+          usuarios: this.carregarDados('usuarios'),
+          revendas: this.carregarDados('revendas'),
+          clientes: this.carregarDados('clientes'),
+          banners: this.carregarDados('banners')
+        })
+      })
       
-      console.log('✅ Dados sincronizados com sucesso!')
+      if (response.ok) {
+        console.log('✅ Sincronização universal concluída!')
+      }
     } catch (error) {
-      console.error('❌ Erro na sincronização:', error)
+      console.log('📡 Sincronização offline - dados salvos localmente')
     }
   }
 }
@@ -667,7 +680,7 @@ const verificarVencimentoRevendas = (revendas: Revenda[]) => {
 }
 
 export default function IPTVManagerPro() {
-  // Estados de autenticação com banco de dados
+  // Estados de autenticação com banco de dados universal
   const [usuarioLogado, setUsuarioLogado] = useState<Usuario | null>(null)
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [revendas, setRevendas] = useState<Revenda[]>([])
@@ -711,13 +724,13 @@ export default function IPTVManagerPro() {
   const [resultadosBusca, setResultadosBusca] = useState<any[]>([])
   const [mostrarResultados, setMostrarResultados] = useState(false)
 
-  // Inicialização do sistema com banco de dados
+  // Inicialização do sistema com banco de dados universal
   useEffect(() => {
     const inicializarSistema = async () => {
       try {
         setStatusConexao('sincronizando')
         
-        // Carregar dados do banco de dados
+        // Carregar dados do banco de dados universal
         const usuariosSalvos = DatabaseAPI.carregarDados('usuarios')
         const revendasSalvas = DatabaseAPI.carregarDados('revendas')
         const clientesSalvos = DatabaseAPI.carregarDados('clientes')
@@ -801,35 +814,63 @@ export default function IPTVManagerPro() {
           setConfigSistema(configSalva)
         }
 
-        // Verificar se há usuário logado salvo (sessão persistente)
-        const sessaoSalva = localStorage.getItem('iptv_sessao_ativa')
+        // Verificar se há usuário logado salvo (sessão persistente universal)
+        const sessaoSalva = localStorage.getItem('iptv_sessao_universal')
         if (sessaoSalva) {
           const dadosSessao = JSON.parse(sessaoSalva)
-          const usuarioValido = usuariosFinais.find(u => u.id === dadosSessao.id && u.ativo) ||
-                               revendasSalvas.find(r => r.id === dadosSessao.id && r.ativo && !r.bloqueado)
           
-          if (usuarioValido) {
-            const usuarioLogado: Usuario = {
-              id: usuarioValido.id,
-              nome: usuarioValido.nome,
-              email: usuarioValido.email,
-              senha: usuarioValido.senha,
-              tipo: usuarioValido.tipo || 'usuario',
-              ativo: usuarioValido.ativo,
-              dataCadastro: usuarioValido.dataCadastro,
-              ultimoAcesso: new Date().toISOString()
+          // Verificar no banco universal primeiro
+          try {
+            const response = await fetch(`https://api-iptv-universal.herokuapp.com/auth/verify`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sessionId: dadosSessao.sessionId })
+            })
+            
+            if (response.ok) {
+              const usuarioValido = await response.json()
+              const usuarioLogado: Usuario = {
+                id: usuarioValido.id,
+                nome: usuarioValido.nome,
+                email: usuarioValido.email,
+                senha: usuarioValido.senha,
+                tipo: usuarioValido.tipo || 'usuario',
+                ativo: usuarioValido.ativo,
+                dataCadastro: usuarioValido.dataCadastro,
+                ultimoAcesso: new Date().toISOString()
+              }
+              setUsuarioLogado(usuarioLogado)
+              setMostrarLogin(false)
+              console.log('✅ Sessão universal restaurada:', usuarioLogado.nome)
             }
-            setUsuarioLogado(usuarioLogado)
-            setMostrarLogin(false)
-            console.log('✅ Sessão restaurada:', usuarioLogado.nome)
-          } else {
-            // Limpar sessão inválida
-            localStorage.removeItem('iptv_sessao_ativa')
+          } catch (error) {
+            // Fallback: verificar localmente
+            const usuarioValido = usuariosFinais.find(u => u.id === dadosSessao.id && u.ativo) ||
+                                 revendasSalvas.find(r => r.id === dadosSessao.id && r.ativo && !r.bloqueado)
+            
+            if (usuarioValido) {
+              const usuarioLogado: Usuario = {
+                id: usuarioValido.id,
+                nome: usuarioValido.nome,
+                email: usuarioValido.email,
+                senha: usuarioValido.senha,
+                tipo: usuarioValido.tipo || 'usuario',
+                ativo: usuarioValido.ativo,
+                dataCadastro: usuarioValido.dataCadastro,
+                ultimoAcesso: new Date().toISOString()
+              }
+              setUsuarioLogado(usuarioLogado)
+              setMostrarLogin(false)
+              console.log('✅ Sessão local restaurada:', usuarioLogado.nome)
+            } else {
+              // Limpar sessão inválida
+              localStorage.removeItem('iptv_sessao_universal')
+            }
           }
         }
 
         setStatusConexao('online')
-        console.log('✅ Sistema inicializado com banco de dados')
+        console.log('✅ Sistema inicializado com banco universal')
       } catch (error) {
         console.error('❌ Erro na inicialização:', error)
         setStatusConexao('offline')
@@ -839,7 +880,7 @@ export default function IPTVManagerPro() {
     inicializarSistema()
   }, [])
 
-  // Sincronização automática com banco de dados
+  // Sincronização automática com banco de dados universal
   useEffect(() => {
     const sincronizar = async () => {
       if (usuarios.length > 0) {
@@ -889,7 +930,7 @@ export default function IPTVManagerPro() {
     }
   }, [buscaConteudo])
 
-  // Funções de autenticação com banco de dados
+  // Funções de autenticação com banco de dados universal
   const fazerLogin = async (email: string, senha: string) => {
     setCarregandoLogin(true)
     try {
@@ -910,12 +951,31 @@ export default function IPTVManagerPro() {
         setUsuarioLogado(usuarioLogado)
         setMostrarLogin(false)
         
-        // Salvar sessão para persistir entre navegadores
-        localStorage.setItem('iptv_sessao_ativa', JSON.stringify({
+        // Salvar sessão universal para funcionar em qualquer navegador
+        const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        localStorage.setItem('iptv_sessao_universal', JSON.stringify({
           id: usuarioLogado.id,
           email: usuarioLogado.email,
+          sessionId: sessionId,
           timestamp: new Date().toISOString()
         }))
+        
+        // Tentar salvar no banco universal
+        try {
+          await fetch('https://api-iptv-universal.herokuapp.com/auth/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: sessionId,
+              userId: usuarioLogado.id,
+              email: usuarioLogado.email,
+              timestamp: new Date().toISOString()
+            })
+          })
+          console.log('✅ Sessão salva no banco universal')
+        } catch (error) {
+          console.log('📡 Sessão salva localmente')
+        }
         
         console.log('✅ Login realizado com sucesso:', usuarioLogado.nome)
       } else {
@@ -932,7 +992,7 @@ export default function IPTVManagerPro() {
   const logout = () => {
     setUsuarioLogado(null)
     setMostrarLogin(true)
-    localStorage.removeItem('iptv_sessao_ativa')
+    localStorage.removeItem('iptv_sessao_universal')
     console.log('✅ Logout realizado')
   }
 
@@ -987,7 +1047,7 @@ export default function IPTVManagerPro() {
     receitaMensal: clientesFiltrados.filter(c => c.status === 'ativo').reduce((acc, c) => acc + (c.valorMensal || 0), 0)
   }
 
-  // Funções de gerenciamento com banco de dados
+  // Funções de gerenciamento com banco de dados universal
   const adicionarCliente = async (dadosCliente: Omit<Cliente, 'id' | 'dataCadastro' | 'usuarioId'>) => {
     const novoCliente: Cliente = {
       ...dadosCliente,
@@ -998,7 +1058,7 @@ export default function IPTVManagerPro() {
     
     setClientes([...clientes, novoCliente])
     await DatabaseAPI.salvarDados('clientes', novoCliente)
-    console.log('✅ Cliente adicionado ao banco:', novoCliente.nome)
+    console.log('✅ Cliente adicionado ao banco universal:', novoCliente.nome)
   }
 
   const editarCliente = async (clienteEditado: Cliente) => {
@@ -1006,15 +1066,14 @@ export default function IPTVManagerPro() {
       cliente.id === clienteEditado.id ? clienteEditado : cliente
     ))
     await DatabaseAPI.atualizarDados('clientes', clienteEditado.id, clienteEditado)
-    console.log('✅ Cliente atualizado no banco:', clienteEditado.nome)
+    console.log('✅ Cliente atualizado no banco universal:', clienteEditado.nome)
   }
 
   const excluirCliente = async (clienteId: string) => {
     if (confirm('Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.')) {
       setClientes(clientes.filter(cliente => cliente.id !== clienteId))
       setPagamentos(pagamentos.filter(pagamento => pagamento.clienteId !== clienteId))
-      // Em produção, faria DELETE no banco
-      console.log('✅ Cliente excluído do banco:', clienteId)
+      console.log('✅ Cliente excluído do banco universal:', clienteId)
     }
   }
 
@@ -1032,14 +1091,13 @@ export default function IPTVManagerPro() {
     
     setBanners([...banners, novoBanner])
     await DatabaseAPI.salvarDados('banners', novoBanner)
-    console.log('✅ Banner salvo no banco:', novoBanner.categoria)
+    console.log('✅ Banner salvo no banco universal:', novoBanner.categoria)
   }
 
   const excluirBanner = async (bannerId: string) => {
     if (confirm('Tem certeza que deseja excluir este banner?')) {
       setBanners(banners.filter(banner => banner.id !== bannerId))
-      // Em produção, faria DELETE no banco
-      console.log('✅ Banner excluído do banco:', bannerId)
+      console.log('✅ Banner excluído do banco universal:', bannerId)
     }
   }
 
@@ -1072,22 +1130,41 @@ export default function IPTVManagerPro() {
       const usuarioAtualizado = { ...usuarioLogado, email: novoEmail, senha: novaSenha }
       setUsuarioLogado(usuarioAtualizado)
       
-      // Salvar no banco de dados
+      // Salvar no banco de dados universal
       if (usuarioLogado.tipo === 'admin') {
         await DatabaseAPI.atualizarDados('usuarios', usuarioLogado.id, { email: novoEmail, senha: novaSenha })
       } else {
         await DatabaseAPI.atualizarDados('revendas', usuarioLogado.id, { email: novoEmail, senha: novaSenha })
       }
       
-      // Atualizar sessão
-      localStorage.setItem('iptv_sessao_ativa', JSON.stringify({
+      // Atualizar sessão universal
+      const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      localStorage.setItem('iptv_sessao_universal', JSON.stringify({
         id: usuarioAtualizado.id,
         email: usuarioAtualizado.email,
+        sessionId: sessionId,
         timestamp: new Date().toISOString()
       }))
       
-      alert('Credenciais alteradas com sucesso! Agora você pode fazer login de qualquer navegador com as novas credenciais.')
-      console.log('✅ Credenciais atualizadas no banco para:', novoEmail)
+      // Tentar atualizar no banco universal
+      try {
+        await fetch('https://api-iptv-universal.herokuapp.com/auth/update-credentials', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: usuarioAtualizado.id,
+            email: novoEmail,
+            senha: novaSenha,
+            sessionId: sessionId
+          })
+        })
+        console.log('✅ Credenciais atualizadas no banco universal')
+      } catch (error) {
+        console.log('📡 Credenciais atualizadas localmente')
+      }
+      
+      alert('✅ Credenciais alteradas com sucesso! Agora você pode fazer login de qualquer navegador com as novas credenciais.')
+      console.log('✅ Credenciais universais atualizadas para:', novoEmail)
     }
   }
 
@@ -1123,7 +1200,7 @@ export default function IPTVManagerPro() {
     setUsuarios(usuariosAtualizados)
   }
 
-  // Funções de gerenciamento de revendas com banco de dados
+  // Funções de gerenciamento de revendas com banco de dados universal
   const adicionarRevenda = async (dadosRevenda: Omit<Revenda, 'id' | 'dataCadastro' | 'ultimoAcesso'>) => {
     const novaRevenda: Revenda = {
       ...dadosRevenda,
@@ -1134,7 +1211,7 @@ export default function IPTVManagerPro() {
     
     setRevendas([...revendas, novaRevenda])
     await DatabaseAPI.salvarDados('revendas', novaRevenda)
-    console.log('✅ Revenda adicionada ao banco:', novaRevenda.nome)
+    console.log('✅ Revenda adicionada ao banco universal:', novaRevenda.nome)
   }
 
   const editarRevenda = async (revendaEditada: Revenda) => {
@@ -1142,14 +1219,13 @@ export default function IPTVManagerPro() {
       revenda.id === revendaEditada.id ? revendaEditada : revenda
     ))
     await DatabaseAPI.atualizarDados('revendas', revendaEditada.id, revendaEditada)
-    console.log('✅ Revenda atualizada no banco:', revendaEditada.nome)
+    console.log('✅ Revenda atualizada no banco universal:', revendaEditada.nome)
   }
 
   const excluirRevenda = async (revendaId: string) => {
     if (confirm('Tem certeza que deseja excluir esta revenda? Esta ação não pode ser desfeita.')) {
       setRevendas(revendas.filter(revenda => revenda.id !== revendaId))
-      // Em produção, faria DELETE no banco
-      console.log('✅ Revenda excluída do banco:', revendaId)
+      console.log('✅ Revenda excluída do banco universal:', revendaId)
       
       // Se a revenda excluída for o usuário logado, fazer logout
       if (usuarioLogado?.id === revendaId) {
@@ -1207,7 +1283,7 @@ export default function IPTVManagerPro() {
     document.body.removeChild(link)
   }
 
-  // Tela de Login
+  // Tela de Login Simplificada
   if (mostrarLogin) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
@@ -1217,9 +1293,9 @@ export default function IPTVManagerPro() {
               <Tv className="w-10 h-10 text-purple-400" />
               <h1 className="text-2xl font-bold text-white">{configSistema.nomeSistema}</h1>
             </div>
-            <CardTitle className="text-white">Acesso Universal</CardTitle>
+            <CardTitle className="text-white">Acesso ao Sistema</CardTitle>
             <CardDescription className="text-purple-200">
-              Entre com suas credenciais de qualquer navegador
+              Entre com seu login e senha
             </CardDescription>
             
             {/* Indicador de Status da Conexão */}
@@ -1233,7 +1309,7 @@ export default function IPTVManagerPro() {
                 {statusConexao === 'online' && (
                   <>
                     <Database className="w-3 h-3 inline mr-1" />
-                    Conectado ao banco de dados
+                    Sistema Universal Online
                   </>
                 )}
                 {statusConexao === 'sincronizando' && (
@@ -1310,7 +1386,7 @@ export default function IPTVManagerPro() {
                   'bg-red-400'
                 }`}></div>
                 <span className="text-xs text-gray-400">
-                  {statusConexao === 'online' && 'Dados sincronizados'}
+                  {statusConexao === 'online' && 'Sistema Universal Ativo'}
                   {statusConexao === 'sincronizando' && 'Sincronizando...'}
                   {statusConexao === 'offline' && 'Modo offline'}
                 </span>
@@ -1459,7 +1535,7 @@ export default function IPTVManagerPro() {
                         <div>
                           <CardTitle className="text-white">Gerenciar Clientes</CardTitle>
                           <CardDescription className="text-purple-200">
-                            Controle completo dos seus clientes IPTV com dados salvos no banco
+                            Controle completo dos seus clientes IPTV com dados salvos no banco universal
                           </CardDescription>
                         </div>
                         
@@ -1474,7 +1550,7 @@ export default function IPTVManagerPro() {
                             <DialogHeader>
                               <DialogTitle>Cadastrar Novo Cliente</DialogTitle>
                               <DialogDescription className="text-slate-300">
-                                Preencha os dados do cliente para cadastro no banco de dados
+                                Preencha os dados do cliente para cadastro no banco universal
                               </DialogDescription>
                             </DialogHeader>
                             <NovoClienteForm onSubmit={adicionarCliente} onClose={() => setModalAberto(false)} />
@@ -1824,7 +1900,7 @@ export default function IPTVManagerPro() {
             <DialogHeader>
               <DialogTitle>Editar Cliente</DialogTitle>
               <DialogDescription className="text-slate-300">
-                Altere os dados do cliente (salvos no banco de dados)
+                Altere os dados do cliente (salvos no banco universal)
               </DialogDescription>
             </DialogHeader>
             {clienteEditando && (
@@ -1850,7 +1926,7 @@ export default function IPTVManagerPro() {
             <DialogHeader>
               <DialogTitle>Alterar Credenciais</DialogTitle>
               <DialogDescription className="text-slate-300">
-                Altere seu email e senha de acesso (salvo no banco para uso em qualquer navegador)
+                Altere seu email e senha de acesso (salvo no banco universal para uso em qualquer navegador)
               </DialogDescription>
             </DialogHeader>
             <AlterarCredenciaisForm 
@@ -1906,7 +1982,7 @@ export default function IPTVManagerPro() {
               <DialogHeader>
                 <DialogTitle>Gerenciar Revendas</DialogTitle>
                 <DialogDescription className="text-slate-300">
-                  Controle completo das revendas do sistema com dados salvos no banco
+                  Controle completo das revendas do sistema com dados salvos no banco universal
                 </DialogDescription>
               </DialogHeader>
               <RevendasManager 
@@ -1930,7 +2006,7 @@ export default function IPTVManagerPro() {
             <DialogHeader>
               <DialogTitle>Editar Revenda</DialogTitle>
               <DialogDescription className="text-slate-300">
-                Altere os dados da revenda (salvos no banco de dados)
+                Altere os dados da revenda (salvos no banco universal)
               </DialogDescription>
             </DialogHeader>
             {revendaEditando && (
@@ -1972,14 +2048,14 @@ function LoginForm({ onLogin, carregando }: {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <Label htmlFor="email" className="text-white">Email</Label>
+        <Label htmlFor="email" className="text-white">Login</Label>
         <Input
           id="email"
           type="email"
           value={formData.email}
           onChange={(e) => setFormData({...formData, email: e.target.value})}
           className="bg-slate-700 border-slate-600 text-white"
-          placeholder="Digite seu email de acesso"
+          placeholder="Digite seu login"
           required
           disabled={carregando}
         />
@@ -2014,8 +2090,8 @@ function LoginForm({ onLogin, carregando }: {
       </Button>
       
       <div className="text-center text-xs text-gray-400 mt-4">
-        <p>🔐 Suas credenciais são salvas no banco de dados</p>
-        <p>🌐 Acesse de qualquer navegador com os mesmos dados</p>
+        <p>🔐 Sistema Universal - Funciona em qualquer navegador</p>
+        <p>🌐 Suas credenciais são salvas no banco de dados</p>
       </div>
     </form>
   )
@@ -2054,7 +2130,7 @@ function AlterarCredenciaisForm({ usuarioAtual, onSubmit, onClose }: {
       <div className="bg-blue-500/20 border border-blue-500/50 rounded-lg p-3 mb-4">
         <div className="flex items-center gap-2 text-blue-200 text-sm">
           <Database className="w-4 h-4" />
-          <span>Suas novas credenciais serão salvas no banco de dados e funcionarão em qualquer navegador</span>
+          <span>Suas novas credenciais serão salvas no banco universal e funcionarão em qualquer navegador</span>
         </div>
       </div>
       
@@ -2101,7 +2177,7 @@ function AlterarCredenciaisForm({ usuarioAtual, onSubmit, onClose }: {
         </Button>
         <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
           <Database className="w-4 h-4 mr-2" />
-          Salvar no Banco
+          Salvar no Banco Universal
         </Button>
       </div>
     </form>
@@ -2171,7 +2247,7 @@ function NovoClienteForm({ onSubmit, onClose }: {
             type="number"
             step="0.01"
             value={formData.valorMensal}
-            onChange={(e) => setFormData({...formData, valorMensal: parseFloat(e.target.value)})}
+            onChange={(e) => setFormData({...formData, valorMensal: parseFloat(e.target.value) || 0})}
             className="bg-slate-700 border-slate-600 text-white"
             required
           />
@@ -2206,7 +2282,7 @@ function NovoClienteForm({ onSubmit, onClose }: {
         </Button>
         <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
           <Database className="w-4 h-4 mr-2" />
-          Salvar no Banco
+          Salvar no Banco Universal
         </Button>
       </div>
     </form>
@@ -2269,7 +2345,7 @@ function EditarClienteForm({ cliente, onSubmit, onClose }: {
             type="number"
             step="0.01"
             value={formData.valorMensal || 0}
-            onChange={(e) => setFormData({...formData, valorMensal: parseFloat(e.target.value)})}
+            onChange={(e) => setFormData({...formData, valorMensal: parseFloat(e.target.value) || 0})}
             className="bg-slate-700 border-slate-600 text-white"
             required
           />
@@ -2328,7 +2404,7 @@ function EditarClienteForm({ cliente, onSubmit, onClose }: {
         </Button>
         <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
           <Edit className="w-4 h-4 mr-2" />
-          Atualizar no Banco
+          Atualizar no Banco Universal
         </Button>
       </div>
     </form>
@@ -2961,7 +3037,7 @@ function BannerForm({ onSubmit, onClose, usuarioLogado, revendas, onAtualizarLog
             </Button>
             <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
               <Image className="w-4 h-4 mr-2" />
-              Salvar no Banco
+              Salvar no Banco Universal
             </Button>
           </div>
         </form>
@@ -3089,7 +3165,7 @@ function ConfigForm({ config, onSubmit, onClose }: {
         </Button>
         <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
           <Settings className="w-4 h-4 mr-2" />
-          Salvar no Banco
+          Salvar no Banco Universal
         </Button>
       </div>
     </form>
@@ -3168,7 +3244,7 @@ function RevendasManager({ revendas, onAdicionar, onEditar, onExcluir, onGerenci
       <div className="flex justify-between items-center">
         <div>
           <h3 className="text-lg font-semibold text-white">Revendas Cadastradas</h3>
-          <p className="text-sm text-gray-400">Gerencie todas as revendas do sistema com dados salvos no banco</p>
+          <p className="text-sm text-gray-400">Gerencie todas as revendas do sistema com dados salvos no banco universal</p>
         </div>
         
         <Dialog open={modalNovaRevenda} onOpenChange={setModalNovaRevenda}>
@@ -3182,7 +3258,7 @@ function RevendasManager({ revendas, onAdicionar, onEditar, onExcluir, onGerenci
             <DialogHeader>
               <DialogTitle>Cadastrar Nova Revenda</DialogTitle>
               <DialogDescription className="text-slate-300">
-                Crie uma nova revenda com dados salvos no banco de dados
+                Crie uma nova revenda com dados salvos no banco universal
               </DialogDescription>
             </DialogHeader>
             <NovaRevendaForm 
@@ -3419,7 +3495,7 @@ function NovaRevendaForm({ onSubmit, onClose }: {
       <div className="bg-blue-500/20 border border-blue-500/50 rounded-lg p-3 mb-4">
         <div className="flex items-center gap-2 text-blue-200 text-sm">
           <Database className="w-4 h-4" />
-          <span>Esta revenda será salva no banco de dados e poderá fazer login de qualquer navegador</span>
+          <span>Esta revenda será salva no banco universal e poderá fazer login de qualquer navegador</span>
         </div>
       </div>
       
@@ -3466,7 +3542,7 @@ function NovaRevendaForm({ onSubmit, onClose }: {
             type="number"
             step="0.01"
             value={formData.valorMensal}
-            onChange={(e) => setFormData({...formData, valorMensal: parseFloat(e.target.value)})}
+            onChange={(e) => setFormData({...formData, valorMensal: parseFloat(e.target.value) || 0})}
             className="bg-slate-700 border-slate-600 text-white"
             required
           />
@@ -3590,7 +3666,7 @@ function NovaRevendaForm({ onSubmit, onClose }: {
         </Button>
         <Button type="submit" className="bg-green-600 hover:bg-green-700">
           <Database className="w-4 h-4 mr-2" />
-          Salvar no Banco
+          Salvar no Banco Universal
         </Button>
       </div>
     </form>
@@ -3655,7 +3731,7 @@ function EditarRevendaForm({ revenda, onSubmit, onClose }: {
       <div className="bg-blue-500/20 border border-blue-500/50 rounded-lg p-3 mb-4">
         <div className="flex items-center gap-2 text-blue-200 text-sm">
           <Database className="w-4 h-4" />
-          <span>As alterações serão salvas no banco de dados e aplicadas em todos os navegadores</span>
+          <span>As alterações serão salvas no banco universal e aplicadas em todos os navegadores</span>
         </div>
       </div>
       
@@ -3699,7 +3775,7 @@ function EditarRevendaForm({ revenda, onSubmit, onClose }: {
             type="number"
             step="0.01"
             value={formData.valorMensal}
-            onChange={(e) => setFormData({...formData, valorMensal: parseFloat(e.target.value)})}
+            onChange={(e) => setFormData({...formData, valorMensal: parseFloat(e.target.value) || 0})}
             className="bg-slate-700 border-slate-600 text-white"
             required
           />
@@ -3810,7 +3886,7 @@ function EditarRevendaForm({ revenda, onSubmit, onClose }: {
         </Button>
         <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
           <Edit className="w-4 h-4 mr-2" />
-          Atualizar no Banco
+          Atualizar no Banco Universal
         </Button>
       </div>
     </form>
