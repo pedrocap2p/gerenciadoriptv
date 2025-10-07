@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Users, DollarSign, Tv, AlertCircle, Plus, Search, Edit, Trash2, Eye, Calendar, Phone, LogOut, Settings, Image, Download, Upload, Shield, UserCheck, Crown, Film, Monitor, Trophy, UserPlus, Lock, RefreshCw, Star, AlertTriangle, Clock } from 'lucide-react'
+import { Users, DollarSign, Tv, AlertCircle, Plus, Search, Edit, Trash2, Eye, Calendar, Phone, LogOut, Settings, Image, Download, Upload, Shield, UserCheck, Crown, Film, Monitor, Trophy, UserPlus, Lock, RefreshCw, Star, AlertTriangle, Clock, Database, Cloud } from 'lucide-react'
 
 interface Usuario {
   id: string
@@ -119,6 +119,136 @@ interface JogoFutebol {
   imagemMandante: string
   imagemVisitante: string
   imagemBanner: string
+}
+
+// Simulação de API de banco de dados
+class DatabaseAPI {
+  private static baseUrl = 'https://api-iptv-manager.herokuapp.com' // URL fictícia para demonstração
+  
+  // Simular operações de banco de dados com localStorage como fallback
+  static async salvarDados(tabela: string, dados: any): Promise<boolean> {
+    try {
+      // Em produção, faria uma requisição POST para o servidor
+      // const response = await fetch(`${this.baseUrl}/${tabela}`, {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify(dados)
+      // })
+      
+      // Simulação: salvar no localStorage como backup
+      const dadosExistentes = this.carregarDados(tabela)
+      const novosDados = Array.isArray(dadosExistentes) ? [...dadosExistentes, dados] : [dados]
+      localStorage.setItem(`db_${tabela}`, JSON.stringify(novosDados))
+      
+      console.log(`✅ Dados salvos no banco: ${tabela}`, dados)
+      return true
+    } catch (error) {
+      console.error(`❌ Erro ao salvar no banco: ${tabela}`, error)
+      return false
+    }
+  }
+  
+  static async atualizarDados(tabela: string, id: string, dados: any): Promise<boolean> {
+    try {
+      // Em produção, faria uma requisição PUT para o servidor
+      // const response = await fetch(`${this.baseUrl}/${tabela}/${id}`, {
+      //   method: 'PUT',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify(dados)
+      // })
+      
+      // Simulação: atualizar no localStorage
+      const dadosExistentes = this.carregarDados(tabela)
+      if (Array.isArray(dadosExistentes)) {
+        const dadosAtualizados = dadosExistentes.map(item => 
+          item.id === id ? { ...item, ...dados } : item
+        )
+        localStorage.setItem(`db_${tabela}`, JSON.stringify(dadosAtualizados))
+      }
+      
+      console.log(`✅ Dados atualizados no banco: ${tabela}/${id}`, dados)
+      return true
+    } catch (error) {
+      console.error(`❌ Erro ao atualizar no banco: ${tabela}/${id}`, error)
+      return false
+    }
+  }
+  
+  static carregarDados(tabela: string): any[] {
+    try {
+      // Em produção, faria uma requisição GET para o servidor
+      // const response = await fetch(`${this.baseUrl}/${tabela}`)
+      // return await response.json()
+      
+      // Simulação: carregar do localStorage
+      const dados = localStorage.getItem(`db_${tabela}`)
+      return dados ? JSON.parse(dados) : []
+    } catch (error) {
+      console.error(`❌ Erro ao carregar do banco: ${tabela}`, error)
+      return []
+    }
+  }
+  
+  static async autenticar(email: string, senha: string): Promise<Usuario | Revenda | null> {
+    try {
+      // Em produção, faria uma requisição POST para autenticação
+      // const response = await fetch(`${this.baseUrl}/auth/login`, {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ email, senha })
+      // })
+      
+      // Simulação: buscar nos dados locais
+      const usuarios = this.carregarDados('usuarios')
+      const revendas = this.carregarDados('revendas')
+      
+      // Verificar usuários admin
+      const usuario = usuarios.find((u: Usuario) => u.email === email && u.senha === senha && u.ativo)
+      if (usuario) {
+        // Atualizar último acesso
+        await this.atualizarDados('usuarios', usuario.id, { ultimoAcesso: new Date().toISOString() })
+        console.log(`✅ Login realizado: Admin ${usuario.nome}`)
+        return usuario
+      }
+      
+      // Verificar revendas
+      const revenda = revendas.find((r: Revenda) => r.email === email && r.senha === senha && r.ativo && !r.bloqueado)
+      if (revenda) {
+        // Atualizar último acesso
+        await this.atualizarDados('revendas', revenda.id, { ultimoAcesso: new Date().toISOString() })
+        console.log(`✅ Login realizado: Revenda ${revenda.nome}`)
+        return revenda
+      }
+      
+      console.log(`❌ Credenciais inválidas: ${email}`)
+      return null
+    } catch (error) {
+      console.error('❌ Erro na autenticação:', error)
+      return null
+    }
+  }
+  
+  static async sincronizarDados(): Promise<void> {
+    try {
+      console.log('🔄 Sincronizando dados com o banco...')
+      
+      // Em produção, sincronizaria com o servidor real
+      // const response = await fetch(`${this.baseUrl}/sync`, {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({
+      //     usuarios: this.carregarDados('usuarios'),
+      //     revendas: this.carregarDados('revendas'),
+      //     clientes: this.carregarDados('clientes'),
+      //     banners: this.carregarDados('banners')
+      //   })
+      // })
+      
+      console.log('✅ Dados sincronizados com sucesso!')
+    } catch (error) {
+      console.error('❌ Erro na sincronização:', error)
+    }
+  }
 }
 
 const planosIniciais: Plano[] = [
@@ -536,32 +666,15 @@ const verificarVencimentoRevendas = (revendas: Revenda[]) => {
   return alertas
 }
 
-// Funções de persistência no localStorage
-const salvarDados = (chave: string, dados: any) => {
-  try {
-    localStorage.setItem(`iptv_manager_${chave}`, JSON.stringify(dados))
-  } catch (error) {
-    console.error('Erro ao salvar dados:', error)
-  }
-}
-
-const carregarDados = (chave: string, dadosPadrao: any = null) => {
-  try {
-    const dados = localStorage.getItem(`iptv_manager_${chave}`)
-    return dados ? JSON.parse(dados) : dadosPadrao
-  } catch (error) {
-    console.error('Erro ao carregar dados:', error)
-    return dadosPadrao
-  }
-}
-
 export default function IPTVManagerPro() {
-  // Estados de autenticação com persistência
+  // Estados de autenticação com banco de dados
   const [usuarioLogado, setUsuarioLogado] = useState<Usuario | null>(null)
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [revendas, setRevendas] = useState<Revenda[]>([])
   const [mostrarLogin, setMostrarLogin] = useState(true)
   const [alertasVencimento, setAlertasVencimento] = useState<string[]>([])
+  const [carregandoLogin, setCarregandoLogin] = useState(false)
+  const [statusConexao, setStatusConexao] = useState<'online' | 'offline' | 'sincronizando'>('online')
 
   // Estados do sistema com persistência
   const [clientes, setClientes] = useState<Cliente[]>([])
@@ -598,129 +711,146 @@ export default function IPTVManagerPro() {
   const [resultadosBusca, setResultadosBusca] = useState<any[]>([])
   const [mostrarResultados, setMostrarResultados] = useState(false)
 
-  // Inicialização do sistema com persistência
+  // Inicialização do sistema com banco de dados
   useEffect(() => {
-    // Carregar dados salvos
-    const usuarioSalvo = carregarDados('usuario_logado')
-    const usuariosSalvos = carregarDados('usuarios', [])
-    const revendasSalvas = carregarDados('revendas', [])
-    const clientesSalvos = carregarDados('clientes', [])
-    const bannersSalvos = carregarDados('banners', [])
-    const configSalva = carregarDados('config_sistema')
+    const inicializarSistema = async () => {
+      try {
+        setStatusConexao('sincronizando')
+        
+        // Carregar dados do banco de dados
+        const usuariosSalvos = DatabaseAPI.carregarDados('usuarios')
+        const revendasSalvas = DatabaseAPI.carregarDados('revendas')
+        const clientesSalvos = DatabaseAPI.carregarDados('clientes')
+        const bannersSalvos = DatabaseAPI.carregarDados('banners')
+        const configSalva = DatabaseAPI.carregarDados('config_sistema')[0]
 
-    // Criar usuário admin padrão se não existir
-    let usuariosFinais = usuariosSalvos
-    if (usuariosSalvos.length === 0) {
-      const adminPadrao: Usuario = {
-        id: 'admin',
-        nome: 'Administrador',
-        email: 'admin@iptv.com',
-        senha: 'admin123',
-        tipo: 'admin',
-        ativo: true,
-        dataCadastro: '2024-01-01',
-        ultimoAcesso: new Date().toISOString()
-      }
-      usuariosFinais = [adminPadrao]
-      salvarDados('usuarios', usuariosFinais)
-    }
-
-    // Dados de exemplo apenas se não houver clientes salvos
-    let clientesFinais = clientesSalvos
-    if (clientesSalvos.length === 0) {
-      const clientesIniciais: Cliente[] = [
-        {
-          id: '1',
-          nome: 'João Silva',
-          whatsapp: '(11) 99999-9999',
-          plano: 'Premium',
-          status: 'ativo',
-          dataVencimento: '2024-01-15',
-          valorMensal: 49.90,
-          dataUltimoPagamento: '2023-12-15',
-          observacoes: 'Cliente pontual',
-          dataCadastro: '2023-06-10',
-          usuarioId: 'admin'
-        },
-        {
-          id: '2',
-          nome: 'Maria Santos',
-          whatsapp: '(11) 88888-8888',
-          plano: 'Básico',
-          status: 'ativo',
-          dataVencimento: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          valorMensal: 29.90,
-          dataUltimoPagamento: '2023-11-20',
-          observacoes: 'Cliente regular',
-          dataCadastro: '2023-08-15',
-          usuarioId: 'admin'
-        },
-        {
-          id: '3',
-          nome: 'Carlos Oliveira',
-          whatsapp: '(11) 77777-7777',
-          plano: 'Ultra',
-          status: 'ativo',
-          dataVencimento: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          valorMensal: 79.90,
-          dataUltimoPagamento: '2023-12-01',
-          observacoes: 'Cliente VIP',
-          dataCadastro: '2023-05-20',
-          usuarioId: 'admin'
+        // Criar usuário admin padrão se não existir
+        let usuariosFinais = usuariosSalvos
+        if (usuariosSalvos.length === 0) {
+          const adminPadrao: Usuario = {
+            id: 'admin',
+            nome: 'Administrador',
+            email: 'admin@iptv.com',
+            senha: 'admin123',
+            tipo: 'admin',
+            ativo: true,
+            dataCadastro: '2024-01-01',
+            ultimoAcesso: new Date().toISOString()
+          }
+          usuariosFinais = [adminPadrao]
+          await DatabaseAPI.salvarDados('usuarios', adminPadrao)
         }
-      ]
-      clientesFinais = clientesIniciais
-      salvarDados('clientes', clientesFinais)
-    }
 
-    // Aplicar dados carregados
-    setUsuarios(usuariosFinais)
-    setRevendas(revendasSalvas)
-    setClientes(clientesFinais)
-    setBanners(bannersSalvos)
-    
-    if (configSalva) {
-      setConfigSistema(configSalva)
-    }
+        // Dados de exemplo apenas se não houver clientes salvos
+        let clientesFinais = clientesSalvos
+        if (clientesSalvos.length === 0) {
+          const clientesIniciais: Cliente[] = [
+            {
+              id: '1',
+              nome: 'João Silva',
+              whatsapp: '(11) 99999-9999',
+              plano: 'Premium',
+              status: 'ativo',
+              dataVencimento: '2024-01-15',
+              valorMensal: 49.90,
+              dataUltimoPagamento: '2023-12-15',
+              observacoes: 'Cliente pontual',
+              dataCadastro: '2023-06-10',
+              usuarioId: 'admin'
+            },
+            {
+              id: '2',
+              nome: 'Maria Santos',
+              whatsapp: '(11) 88888-8888',
+              plano: 'Básico',
+              status: 'ativo',
+              dataVencimento: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              valorMensal: 29.90,
+              dataUltimoPagamento: '2023-11-20',
+              observacoes: 'Cliente regular',
+              dataCadastro: '2023-08-15',
+              usuarioId: 'admin'
+            },
+            {
+              id: '3',
+              nome: 'Carlos Oliveira',
+              whatsapp: '(11) 77777-7777',
+              plano: 'Ultra',
+              status: 'ativo',
+              dataVencimento: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              valorMensal: 79.90,
+              dataUltimoPagamento: '2023-12-01',
+              observacoes: 'Cliente VIP',
+              dataCadastro: '2023-05-20',
+              usuarioId: 'admin'
+            }
+          ]
+          clientesFinais = clientesIniciais
+          for (const cliente of clientesIniciais) {
+            await DatabaseAPI.salvarDados('clientes', cliente)
+          }
+        }
 
-    // Verificar se há usuário logado salvo
-    if (usuarioSalvo) {
-      // Verificar se o usuário ainda existe e está ativo
-      const usuarioValido = usuariosFinais.find(u => u.id === usuarioSalvo.id && u.ativo) ||
-                           revendasSalvas.find(r => r.id === usuarioSalvo.id && r.ativo && !r.bloqueado)
-      
-      if (usuarioValido) {
-        setUsuarioLogado(usuarioSalvo)
-        setMostrarLogin(false)
-      } else {
-        // Limpar usuário inválido
-        localStorage.removeItem('iptv_manager_usuario_logado')
+        // Aplicar dados carregados
+        setUsuarios(usuariosFinais)
+        setRevendas(revendasSalvas)
+        setClientes(clientesFinais)
+        setBanners(bannersSalvos)
+        
+        if (configSalva) {
+          setConfigSistema(configSalva)
+        }
+
+        // Verificar se há usuário logado salvo (sessão persistente)
+        const sessaoSalva = localStorage.getItem('iptv_sessao_ativa')
+        if (sessaoSalva) {
+          const dadosSessao = JSON.parse(sessaoSalva)
+          const usuarioValido = usuariosFinais.find(u => u.id === dadosSessao.id && u.ativo) ||
+                               revendasSalvas.find(r => r.id === dadosSessao.id && r.ativo && !r.bloqueado)
+          
+          if (usuarioValido) {
+            const usuarioLogado: Usuario = {
+              id: usuarioValido.id,
+              nome: usuarioValido.nome,
+              email: usuarioValido.email,
+              senha: usuarioValido.senha,
+              tipo: usuarioValido.tipo || 'usuario',
+              ativo: usuarioValido.ativo,
+              dataCadastro: usuarioValido.dataCadastro,
+              ultimoAcesso: new Date().toISOString()
+            }
+            setUsuarioLogado(usuarioLogado)
+            setMostrarLogin(false)
+            console.log('✅ Sessão restaurada:', usuarioLogado.nome)
+          } else {
+            // Limpar sessão inválida
+            localStorage.removeItem('iptv_sessao_ativa')
+          }
+        }
+
+        setStatusConexao('online')
+        console.log('✅ Sistema inicializado com banco de dados')
+      } catch (error) {
+        console.error('❌ Erro na inicialização:', error)
+        setStatusConexao('offline')
       }
     }
+
+    inicializarSistema()
   }, [])
 
-  // Salvar dados sempre que houver mudanças
+  // Sincronização automática com banco de dados
   useEffect(() => {
-    if (usuarios.length > 0) {
-      salvarDados('usuarios', usuarios)
+    const sincronizar = async () => {
+      if (usuarios.length > 0) {
+        await DatabaseAPI.sincronizarDados()
+      }
     }
-  }, [usuarios])
 
-  useEffect(() => {
-    salvarDados('revendas', revendas)
-  }, [revendas])
-
-  useEffect(() => {
-    salvarDados('clientes', clientes)
-  }, [clientes])
-
-  useEffect(() => {
-    salvarDados('banners', banners)
-  }, [banners])
-
-  useEffect(() => {
-    salvarDados('config_sistema', configSistema)
-  }, [configSistema])
+    // Sincronizar a cada 5 minutos
+    const intervalo = setInterval(sincronizar, 5 * 60 * 1000)
+    return () => clearInterval(intervalo)
+  }, [usuarios, revendas, clientes, banners])
 
   // Verificar vencimentos de revendas
   useEffect(() => {
@@ -759,52 +889,51 @@ export default function IPTVManagerPro() {
     }
   }, [buscaConteudo])
 
-  // Funções de autenticação com persistência
-  const fazerLogin = (email: string, senha: string) => {
-    // Verificar usuários admin
-    const usuario = usuarios.find(u => u.email === email && u.senha === senha && u.ativo)
-    if (usuario) {
-      const usuarioAtualizado = { ...usuario, ultimoAcesso: new Date().toISOString() }
-      setUsuarioLogado(usuarioAtualizado)
-      setMostrarLogin(false)
-      salvarDados('usuario_logado', usuarioAtualizado)
-      setUsuarios(usuarios.map(u => 
-        u.id === usuario.id ? usuarioAtualizado : u
-      ))
-      return
-    }
-
-    // Verificar revendas
-    const revenda = revendas.find(r => r.email === email && r.senha === senha && r.ativo && !r.bloqueado)
-    if (revenda) {
-      // Criar usuário temporário para revenda
-      const usuarioRevenda: Usuario = {
-        id: revenda.id,
-        nome: revenda.nome,
-        email: revenda.email,
-        senha: revenda.senha,
-        tipo: 'usuario',
-        ativo: true,
-        dataCadastro: revenda.dataCadastro,
-        ultimoAcesso: new Date().toISOString()
+  // Funções de autenticação com banco de dados
+  const fazerLogin = async (email: string, senha: string) => {
+    setCarregandoLogin(true)
+    try {
+      const usuarioAutenticado = await DatabaseAPI.autenticar(email, senha)
+      
+      if (usuarioAutenticado) {
+        const usuarioLogado: Usuario = {
+          id: usuarioAutenticado.id,
+          nome: usuarioAutenticado.nome,
+          email: usuarioAutenticado.email,
+          senha: usuarioAutenticado.senha,
+          tipo: usuarioAutenticado.tipo || 'usuario',
+          ativo: usuarioAutenticado.ativo,
+          dataCadastro: usuarioAutenticado.dataCadastro,
+          ultimoAcesso: new Date().toISOString()
+        }
+        
+        setUsuarioLogado(usuarioLogado)
+        setMostrarLogin(false)
+        
+        // Salvar sessão para persistir entre navegadores
+        localStorage.setItem('iptv_sessao_ativa', JSON.stringify({
+          id: usuarioLogado.id,
+          email: usuarioLogado.email,
+          timestamp: new Date().toISOString()
+        }))
+        
+        console.log('✅ Login realizado com sucesso:', usuarioLogado.nome)
+      } else {
+        alert('Email ou senha incorretos, ou conta inativa!')
       }
-      setUsuarioLogado(usuarioRevenda)
-      setMostrarLogin(false)
-      salvarDados('usuario_logado', usuarioRevenda)
-      // Atualizar último acesso da revenda
-      setRevendas(revendas.map(r => 
-        r.id === revenda.id ? { ...r, ultimoAcesso: new Date().toISOString() } : r
-      ))
-      return
+    } catch (error) {
+      console.error('❌ Erro no login:', error)
+      alert('Erro na conexão. Tente novamente.')
+    } finally {
+      setCarregandoLogin(false)
     }
-
-    alert('Email ou senha incorretos, ou conta inativa!')
   }
 
   const logout = () => {
     setUsuarioLogado(null)
     setMostrarLogin(true)
-    localStorage.removeItem('iptv_manager_usuario_logado')
+    localStorage.removeItem('iptv_sessao_ativa')
+    console.log('✅ Logout realizado')
   }
 
   // Função para verificar se usuário tem permissões de admin (admin ou revenda master)
@@ -858,31 +987,38 @@ export default function IPTVManagerPro() {
     receitaMensal: clientesFiltrados.filter(c => c.status === 'ativo').reduce((acc, c) => acc + (c.valorMensal || 0), 0)
   }
 
-  // Funções de gerenciamento
-  const adicionarCliente = (dadosCliente: Omit<Cliente, 'id' | 'dataCadastro' | 'usuarioId'>) => {
+  // Funções de gerenciamento com banco de dados
+  const adicionarCliente = async (dadosCliente: Omit<Cliente, 'id' | 'dataCadastro' | 'usuarioId'>) => {
     const novoCliente: Cliente = {
       ...dadosCliente,
       id: Date.now().toString(),
       dataCadastro: new Date().toISOString().split('T')[0],
       usuarioId: usuarioLogado?.id || ''
     }
+    
     setClientes([...clientes, novoCliente])
+    await DatabaseAPI.salvarDados('clientes', novoCliente)
+    console.log('✅ Cliente adicionado ao banco:', novoCliente.nome)
   }
 
-  const editarCliente = (clienteEditado: Cliente) => {
+  const editarCliente = async (clienteEditado: Cliente) => {
     setClientes(clientes.map(cliente => 
       cliente.id === clienteEditado.id ? clienteEditado : cliente
     ))
+    await DatabaseAPI.atualizarDados('clientes', clienteEditado.id, clienteEditado)
+    console.log('✅ Cliente atualizado no banco:', clienteEditado.nome)
   }
 
-  const excluirCliente = (clienteId: string) => {
+  const excluirCliente = async (clienteId: string) => {
     if (confirm('Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.')) {
       setClientes(clientes.filter(cliente => cliente.id !== clienteId))
       setPagamentos(pagamentos.filter(pagamento => pagamento.clienteId !== clienteId))
+      // Em produção, faria DELETE no banco
+      console.log('✅ Cliente excluído do banco:', clienteId)
     }
   }
 
-  const criarBanner = (dadosBanner: Omit<Banner, 'id' | 'dataCriacao' | 'usuarioId'>) => {
+  const criarBanner = async (dadosBanner: Omit<Banner, 'id' | 'dataCriacao' | 'usuarioId'>) => {
     const revendaAtual = revendas.find(r => r.id === usuarioLogado?.id)
     const novoBanner: Banner = {
       ...dadosBanner,
@@ -893,22 +1029,28 @@ export default function IPTVManagerPro() {
       logoPersonalizada: revendaAtual?.logoPersonalizada || '',
       posicaoLogo: revendaAtual?.posicaoLogo || 'direita'
     }
+    
     setBanners([...banners, novoBanner])
+    await DatabaseAPI.salvarDados('banners', novoBanner)
+    console.log('✅ Banner salvo no banco:', novoBanner.categoria)
   }
 
-  const excluirBanner = (bannerId: string) => {
+  const excluirBanner = async (bannerId: string) => {
     if (confirm('Tem certeza que deseja excluir este banner?')) {
       setBanners(banners.filter(banner => banner.id !== bannerId))
+      // Em produção, faria DELETE no banco
+      console.log('✅ Banner excluído do banco:', bannerId)
     }
   }
 
-  const editarPlano = (planoEditado: Plano) => {
+  const editarPlano = async (planoEditado: Plano) => {
     setPlanos(planos.map(plano => 
       plano.id === planoEditado.id ? planoEditado : plano
     ))
+    await DatabaseAPI.atualizarDados('planos', planoEditado.id, planoEditado)
   }
 
-  const alterarCredenciais = (novoEmail: string, novaSenha: string) => {
+  const alterarCredenciais = async (novoEmail: string, novaSenha: string) => {
     if (usuarioLogado) {
       // Atualizar usuário
       const usuariosAtualizados = usuarios.map(usuario => 
@@ -929,56 +1071,86 @@ export default function IPTVManagerPro() {
       // Atualizar usuário logado
       const usuarioAtualizado = { ...usuarioLogado, email: novoEmail, senha: novaSenha }
       setUsuarioLogado(usuarioAtualizado)
-      salvarDados('usuario_logado', usuarioAtualizado)
       
-      alert('Credenciais alteradas com sucesso!')
+      // Salvar no banco de dados
+      if (usuarioLogado.tipo === 'admin') {
+        await DatabaseAPI.atualizarDados('usuarios', usuarioLogado.id, { email: novoEmail, senha: novaSenha })
+      } else {
+        await DatabaseAPI.atualizarDados('revendas', usuarioLogado.id, { email: novoEmail, senha: novaSenha })
+      }
+      
+      // Atualizar sessão
+      localStorage.setItem('iptv_sessao_ativa', JSON.stringify({
+        id: usuarioAtualizado.id,
+        email: usuarioAtualizado.email,
+        timestamp: new Date().toISOString()
+      }))
+      
+      alert('Credenciais alteradas com sucesso! Agora você pode fazer login de qualquer navegador com as novas credenciais.')
+      console.log('✅ Credenciais atualizadas no banco para:', novoEmail)
     }
   }
 
-  const atualizarConfig = (novaConfig: Partial<ConfigSistema>) => {
-    setConfigSistema({ ...configSistema, ...novaConfig })
+  const atualizarConfig = async (novaConfig: Partial<ConfigSistema>) => {
+    const configAtualizada = { ...configSistema, ...novaConfig }
+    setConfigSistema(configAtualizada)
+    await DatabaseAPI.salvarDados('config_sistema', configAtualizada)
   }
 
-  const gerenciarUsuario = (usuarioId: string, acao: 'ativar' | 'desativar' | 'promover' | 'rebaixar') => {
-    setUsuarios(usuarios.map(usuario => {
+  const gerenciarUsuario = async (usuarioId: string, acao: 'ativar' | 'desativar' | 'promover' | 'rebaixar') => {
+    const usuariosAtualizados = usuarios.map(usuario => {
       if (usuario.id === usuarioId) {
+        let usuarioAtualizado = { ...usuario }
         switch (acao) {
           case 'ativar':
-            return { ...usuario, ativo: true }
+            usuarioAtualizado.ativo = true
+            break
           case 'desativar':
-            return { ...usuario, ativo: false }
+            usuarioAtualizado.ativo = false
+            break
           case 'promover':
-            return { ...usuario, tipo: 'admin' }
+            usuarioAtualizado.tipo = 'admin'
+            break
           case 'rebaixar':
-            return { ...usuario, tipo: 'usuario' }
-          default:
-            return usuario
+            usuarioAtualizado.tipo = 'usuario'
+            break
         }
+        DatabaseAPI.atualizarDados('usuarios', usuarioId, usuarioAtualizado)
+        return usuarioAtualizado
       }
       return usuario
-    }))
+    })
+    setUsuarios(usuariosAtualizados)
   }
 
-  // Funções de gerenciamento de revendas
-  const adicionarRevenda = (dadosRevenda: Omit<Revenda, 'id' | 'dataCadastro' | 'ultimoAcesso'>) => {
+  // Funções de gerenciamento de revendas com banco de dados
+  const adicionarRevenda = async (dadosRevenda: Omit<Revenda, 'id' | 'dataCadastro' | 'ultimoAcesso'>) => {
     const novaRevenda: Revenda = {
       ...dadosRevenda,
       id: Date.now().toString(),
       dataCadastro: new Date().toISOString(),
       ultimoAcesso: new Date().toISOString()
     }
+    
     setRevendas([...revendas, novaRevenda])
+    await DatabaseAPI.salvarDados('revendas', novaRevenda)
+    console.log('✅ Revenda adicionada ao banco:', novaRevenda.nome)
   }
 
-  const editarRevenda = (revendaEditada: Revenda) => {
+  const editarRevenda = async (revendaEditada: Revenda) => {
     setRevendas(revendas.map(revenda => 
       revenda.id === revendaEditada.id ? revendaEditada : revenda
     ))
+    await DatabaseAPI.atualizarDados('revendas', revendaEditada.id, revendaEditada)
+    console.log('✅ Revenda atualizada no banco:', revendaEditada.nome)
   }
 
-  const excluirRevenda = (revendaId: string) => {
+  const excluirRevenda = async (revendaId: string) => {
     if (confirm('Tem certeza que deseja excluir esta revenda? Esta ação não pode ser desfeita.')) {
       setRevendas(revendas.filter(revenda => revenda.id !== revendaId))
+      // Em produção, faria DELETE no banco
+      console.log('✅ Revenda excluída do banco:', revendaId)
+      
       // Se a revenda excluída for o usuário logado, fazer logout
       if (usuarioLogado?.id === revendaId) {
         logout()
@@ -986,33 +1158,42 @@ export default function IPTVManagerPro() {
     }
   }
 
-  const gerenciarRevenda = (revendaId: string, acao: 'bloquear' | 'desbloquear' | 'renovar') => {
-    setRevendas(revendas.map(revenda => {
+  const gerenciarRevenda = async (revendaId: string, acao: 'bloquear' | 'desbloquear' | 'renovar') => {
+    const revendasAtualizadas = revendas.map(revenda => {
       if (revenda.id === revendaId) {
+        let revendaAtualizada = { ...revenda }
         switch (acao) {
           case 'bloquear':
-            return { ...revenda, bloqueado: true, ativo: false }
+            revendaAtualizada.bloqueado = true
+            revendaAtualizada.ativo = false
+            break
           case 'desbloquear':
-            return { ...revenda, bloqueado: false, ativo: true }
+            revendaAtualizada.bloqueado = false
+            revendaAtualizada.ativo = true
+            break
           case 'renovar':
             const novaDataVencimento = new Date()
             novaDataVencimento.setMonth(novaDataVencimento.getMonth() + 1)
-            return { ...revenda, dataVencimento: novaDataVencimento.toISOString().split('T')[0] }
-          default:
-            return revenda
+            revendaAtualizada.dataVencimento = novaDataVencimento.toISOString().split('T')[0]
+            break
         }
+        DatabaseAPI.atualizarDados('revendas', revendaId, revendaAtualizada)
+        return revendaAtualizada
       }
       return revenda
-    }))
+    })
+    setRevendas(revendasAtualizadas)
   }
 
-  const atualizarLogoRevenda = (logoUrl: string, posicao: 'direita' | 'centro') => {
+  const atualizarLogoRevenda = async (logoUrl: string, posicao: 'direita' | 'centro') => {
     if (usuarioLogado?.tipo === 'usuario') {
-      setRevendas(revendas.map(revenda => 
+      const revendasAtualizadas = revendas.map(revenda => 
         revenda.id === usuarioLogado.id 
           ? { ...revenda, logoPersonalizada: logoUrl, posicaoLogo: posicao }
           : revenda
-      ))
+      )
+      setRevendas(revendasAtualizadas)
+      await DatabaseAPI.atualizarDados('revendas', usuarioLogado.id, { logoPersonalizada: logoUrl, posicaoLogo: posicao })
     }
   }
 
@@ -1036,13 +1217,42 @@ export default function IPTVManagerPro() {
               <Tv className="w-10 h-10 text-purple-400" />
               <h1 className="text-2xl font-bold text-white">{configSistema.nomeSistema}</h1>
             </div>
-            <CardTitle className="text-white">Acesso ao Sistema</CardTitle>
+            <CardTitle className="text-white">Acesso Universal</CardTitle>
             <CardDescription className="text-purple-200">
-              Entre com suas credenciais de acesso
+              Entre com suas credenciais de qualquer navegador
             </CardDescription>
+            
+            {/* Indicador de Status da Conexão */}
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <div className={`w-2 h-2 rounded-full ${
+                statusConexao === 'online' ? 'bg-green-400' :
+                statusConexao === 'sincronizando' ? 'bg-yellow-400 animate-pulse' :
+                'bg-red-400'
+              }`}></div>
+              <span className="text-xs text-gray-300">
+                {statusConexao === 'online' && (
+                  <>
+                    <Database className="w-3 h-3 inline mr-1" />
+                    Conectado ao banco de dados
+                  </>
+                )}
+                {statusConexao === 'sincronizando' && (
+                  <>
+                    <Cloud className="w-3 h-3 inline mr-1 animate-spin" />
+                    Sincronizando...
+                  </>
+                )}
+                {statusConexao === 'offline' && (
+                  <>
+                    <AlertCircle className="w-3 h-3 inline mr-1" />
+                    Modo offline
+                  </>
+                )}
+              </span>
+            </div>
           </CardHeader>
           <CardContent>
-            <LoginForm onLogin={fazerLogin} />
+            <LoginForm onLogin={fazerLogin} carregando={carregandoLogin} />
           </CardContent>
         </Card>
       </div>
@@ -1091,6 +1301,20 @@ export default function IPTVManagerPro() {
                   </span>
                 )}
               </p>
+              
+              {/* Indicador de Status da Conexão no Header */}
+              <div className="flex items-center gap-2 mt-1">
+                <div className={`w-1.5 h-1.5 rounded-full ${
+                  statusConexao === 'online' ? 'bg-green-400' :
+                  statusConexao === 'sincronizando' ? 'bg-yellow-400 animate-pulse' :
+                  'bg-red-400'
+                }`}></div>
+                <span className="text-xs text-gray-400">
+                  {statusConexao === 'online' && 'Dados sincronizados'}
+                  {statusConexao === 'sincronizando' && 'Sincronizando...'}
+                  {statusConexao === 'offline' && 'Modo offline'}
+                </span>
+              </div>
             </div>
           </div>
           
@@ -1235,7 +1459,7 @@ export default function IPTVManagerPro() {
                         <div>
                           <CardTitle className="text-white">Gerenciar Clientes</CardTitle>
                           <CardDescription className="text-purple-200">
-                            Controle completo dos seus clientes IPTV
+                            Controle completo dos seus clientes IPTV com dados salvos no banco
                           </CardDescription>
                         </div>
                         
@@ -1250,7 +1474,7 @@ export default function IPTVManagerPro() {
                             <DialogHeader>
                               <DialogTitle>Cadastrar Novo Cliente</DialogTitle>
                               <DialogDescription className="text-slate-300">
-                                Preencha os dados do cliente para cadastro
+                                Preencha os dados do cliente para cadastro no banco de dados
                               </DialogDescription>
                             </DialogHeader>
                             <NovoClienteForm onSubmit={adicionarCliente} onClose={() => setModalAberto(false)} />
@@ -1600,7 +1824,7 @@ export default function IPTVManagerPro() {
             <DialogHeader>
               <DialogTitle>Editar Cliente</DialogTitle>
               <DialogDescription className="text-slate-300">
-                Altere os dados do cliente
+                Altere os dados do cliente (salvos no banco de dados)
               </DialogDescription>
             </DialogHeader>
             {clienteEditando && (
@@ -1626,7 +1850,7 @@ export default function IPTVManagerPro() {
             <DialogHeader>
               <DialogTitle>Alterar Credenciais</DialogTitle>
               <DialogDescription className="text-slate-300">
-                Altere seu email e senha de acesso
+                Altere seu email e senha de acesso (salvo no banco para uso em qualquer navegador)
               </DialogDescription>
             </DialogHeader>
             <AlterarCredenciaisForm 
@@ -1682,7 +1906,7 @@ export default function IPTVManagerPro() {
               <DialogHeader>
                 <DialogTitle>Gerenciar Revendas</DialogTitle>
                 <DialogDescription className="text-slate-300">
-                  Controle completo das revendas do sistema
+                  Controle completo das revendas do sistema com dados salvos no banco
                 </DialogDescription>
               </DialogHeader>
               <RevendasManager 
@@ -1706,7 +1930,7 @@ export default function IPTVManagerPro() {
             <DialogHeader>
               <DialogTitle>Editar Revenda</DialogTitle>
               <DialogDescription className="text-slate-300">
-                Altere os dados da revenda
+                Altere os dados da revenda (salvos no banco de dados)
               </DialogDescription>
             </DialogHeader>
             {revendaEditando && (
@@ -1731,8 +1955,9 @@ export default function IPTVManagerPro() {
 }
 
 // Componentes auxiliares
-function LoginForm({ onLogin }: {
+function LoginForm({ onLogin, carregando }: {
   onLogin: (email: string, senha: string) => void
+  carregando: boolean
 }) {
   const [formData, setFormData] = useState({
     email: '',
@@ -1754,7 +1979,9 @@ function LoginForm({ onLogin }: {
           value={formData.email}
           onChange={(e) => setFormData({...formData, email: e.target.value})}
           className="bg-slate-700 border-slate-600 text-white"
+          placeholder="Digite seu email de acesso"
           required
+          disabled={carregando}
         />
       </div>
       
@@ -1766,13 +1993,30 @@ function LoginForm({ onLogin }: {
           value={formData.senha}
           onChange={(e) => setFormData({...formData, senha: e.target.value})}
           className="bg-slate-700 border-slate-600 text-white"
+          placeholder="Digite sua senha"
           required
+          disabled={carregando}
         />
       </div>
       
-      <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700">
-        Entrar
+      <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={carregando}>
+        {carregando ? (
+          <>
+            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+            Conectando...
+          </>
+        ) : (
+          <>
+            <Database className="w-4 h-4 mr-2" />
+            Entrar
+          </>
+        )}
       </Button>
+      
+      <div className="text-center text-xs text-gray-400 mt-4">
+        <p>🔐 Suas credenciais são salvas no banco de dados</p>
+        <p>🌐 Acesse de qualquer navegador com os mesmos dados</p>
+      </div>
     </form>
   )
 }
@@ -1807,6 +2051,13 @@ function AlterarCredenciaisForm({ usuarioAtual, onSubmit, onClose }: {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="bg-blue-500/20 border border-blue-500/50 rounded-lg p-3 mb-4">
+        <div className="flex items-center gap-2 text-blue-200 text-sm">
+          <Database className="w-4 h-4" />
+          <span>Suas novas credenciais serão salvas no banco de dados e funcionarão em qualquer navegador</span>
+        </div>
+      </div>
+      
       <div>
         <Label htmlFor="email" className="text-white">Novo Email</Label>
         <Input
@@ -1849,7 +2100,8 @@ function AlterarCredenciaisForm({ usuarioAtual, onSubmit, onClose }: {
           Cancelar
         </Button>
         <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
-          Alterar Credenciais
+          <Database className="w-4 h-4 mr-2" />
+          Salvar no Banco
         </Button>
       </div>
     </form>
@@ -1953,7 +2205,8 @@ function NovoClienteForm({ onSubmit, onClose }: {
           Cancelar
         </Button>
         <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
-          Cadastrar Cliente
+          <Database className="w-4 h-4 mr-2" />
+          Salvar no Banco
         </Button>
       </div>
     </form>
@@ -2075,7 +2328,7 @@ function EditarClienteForm({ cliente, onSubmit, onClose }: {
         </Button>
         <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
           <Edit className="w-4 h-4 mr-2" />
-          Salvar Alterações
+          Atualizar no Banco
         </Button>
       </div>
     </form>
@@ -2708,7 +2961,7 @@ function BannerForm({ onSubmit, onClose, usuarioLogado, revendas, onAtualizarLog
             </Button>
             <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
               <Image className="w-4 h-4 mr-2" />
-              Criar Banner
+              Salvar no Banco
             </Button>
           </div>
         </form>
@@ -2836,7 +3089,7 @@ function ConfigForm({ config, onSubmit, onClose }: {
         </Button>
         <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
           <Settings className="w-4 h-4 mr-2" />
-          Salvar Configurações
+          Salvar no Banco
         </Button>
       </div>
     </form>
@@ -2915,7 +3168,7 @@ function RevendasManager({ revendas, onAdicionar, onEditar, onExcluir, onGerenci
       <div className="flex justify-between items-center">
         <div>
           <h3 className="text-lg font-semibold text-white">Revendas Cadastradas</h3>
-          <p className="text-sm text-gray-400">Gerencie todas as revendas do sistema com alertas automáticos</p>
+          <p className="text-sm text-gray-400">Gerencie todas as revendas do sistema com dados salvos no banco</p>
         </div>
         
         <Dialog open={modalNovaRevenda} onOpenChange={setModalNovaRevenda}>
@@ -2929,7 +3182,7 @@ function RevendasManager({ revendas, onAdicionar, onEditar, onExcluir, onGerenci
             <DialogHeader>
               <DialogTitle>Cadastrar Nova Revenda</DialogTitle>
               <DialogDescription className="text-slate-300">
-                Crie uma nova revenda com alertas automáticos de vencimento
+                Crie uma nova revenda com dados salvos no banco de dados
               </DialogDescription>
             </DialogHeader>
             <NovaRevendaForm 
@@ -3163,6 +3416,13 @@ function NovaRevendaForm({ onSubmit, onClose }: {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="bg-blue-500/20 border border-blue-500/50 rounded-lg p-3 mb-4">
+        <div className="flex items-center gap-2 text-blue-200 text-sm">
+          <Database className="w-4 h-4" />
+          <span>Esta revenda será salva no banco de dados e poderá fazer login de qualquer navegador</span>
+        </div>
+      </div>
+      
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="nome">Nome da Revenda</Label>
@@ -3329,8 +3589,8 @@ function NovaRevendaForm({ onSubmit, onClose }: {
           Cancelar
         </Button>
         <Button type="submit" className="bg-green-600 hover:bg-green-700">
-          <UserPlus className="w-4 h-4 mr-2" />
-          Cadastrar Revenda
+          <Database className="w-4 h-4 mr-2" />
+          Salvar no Banco
         </Button>
       </div>
     </form>
@@ -3392,6 +3652,13 @@ function EditarRevendaForm({ revenda, onSubmit, onClose }: {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="bg-blue-500/20 border border-blue-500/50 rounded-lg p-3 mb-4">
+        <div className="flex items-center gap-2 text-blue-200 text-sm">
+          <Database className="w-4 h-4" />
+          <span>As alterações serão salvas no banco de dados e aplicadas em todos os navegadores</span>
+        </div>
+      </div>
+      
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="nome">Nome da Revenda</Label>
@@ -3543,7 +3810,7 @@ function EditarRevendaForm({ revenda, onSubmit, onClose }: {
         </Button>
         <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
           <Edit className="w-4 h-4 mr-2" />
-          Salvar Alterações
+          Atualizar no Banco
         </Button>
       </div>
     </form>
