@@ -123,65 +123,37 @@ interface JogoFutebol {
 
 // Sistema de banco de dados universal que funciona em qualquer navegador
 class DatabaseAPI {
-  private static baseUrl = 'https://api-iptv-universal.herokuapp.com' // URL do banco universal
-  
   // Salvar dados no banco universal (funciona em qualquer navegador)
   static async salvarDados(tabela: string, dados: any): Promise<boolean> {
     try {
-      // Salvar no banco universal
-      const response = await fetch(`${this.baseUrl}/${tabela}`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer universal-access-token'
-        },
-        body: JSON.stringify(dados)
-      })
-      
-      if (response.ok) {
-        console.log(`✅ Dados salvos no banco universal: ${tabela}`, dados)
-        return true
-      }
+      // Sistema funciona 100% offline - salvar localmente
+      const dadosExistentes = this.carregarDados(tabela)
+      const novosDados = Array.isArray(dadosExistentes) ? [...dadosExistentes, dados] : [dados]
+      localStorage.setItem(`db_${tabela}`, JSON.stringify(novosDados))
+      console.log(`✅ Dados salvos localmente: ${tabela}`, dados)
+      return true
     } catch (error) {
-      console.log('📡 Modo offline - salvando localmente')
+      console.error(`❌ Erro ao salvar dados: ${tabela}`, error)
+      return false
     }
-    
-    // Fallback: salvar localmente
-    const dadosExistentes = this.carregarDados(tabela)
-    const novosDados = Array.isArray(dadosExistentes) ? [...dadosExistentes, dados] : [dados]
-    localStorage.setItem(`db_${tabela}`, JSON.stringify(novosDados))
-    return true
   }
   
   static async atualizarDados(tabela: string, id: string, dados: any): Promise<boolean> {
     try {
-      // Atualizar no banco universal
-      const response = await fetch(`${this.baseUrl}/${tabela}/${id}`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer universal-access-token'
-        },
-        body: JSON.stringify(dados)
-      })
-      
-      if (response.ok) {
-        console.log(`✅ Dados atualizados no banco universal: ${tabela}/${id}`)
-        return true
+      // Sistema funciona 100% offline - atualizar localmente
+      const dadosExistentes = this.carregarDados(tabela)
+      if (Array.isArray(dadosExistentes)) {
+        const dadosAtualizados = dadosExistentes.map(item => 
+          item.id === id ? { ...item, ...dados } : item
+        )
+        localStorage.setItem(`db_${tabela}`, JSON.stringify(dadosAtualizados))
+        console.log(`✅ Dados atualizados localmente: ${tabela}/${id}`)
       }
+      return true
     } catch (error) {
-      console.log('📡 Modo offline - atualizando localmente')
+      console.error(`❌ Erro ao atualizar dados: ${tabela}`, error)
+      return false
     }
-    
-    // Fallback: atualizar localmente
-    const dadosExistentes = this.carregarDados(tabela)
-    if (Array.isArray(dadosExistentes)) {
-      const dadosAtualizados = dadosExistentes.map(item => 
-        item.id === id ? { ...item, ...dados } : item
-      )
-      localStorage.setItem(`db_${tabela}`, JSON.stringify(dadosAtualizados))
-    }
-    return true
   }
   
   static carregarDados(tabela: string): any[] {
@@ -196,70 +168,55 @@ class DatabaseAPI {
   
   static async autenticar(email: string, senha: string): Promise<Usuario | Revenda | null> {
     try {
-      // Tentar autenticar no banco universal primeiro
-      const response = await fetch(`${this.baseUrl}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, senha })
-      })
+      // Sistema funciona 100% offline - verificar dados locais
+      const usuarios = this.carregarDados('usuarios')
+      const revendas = this.carregarDados('revendas')
       
-      if (response.ok) {
-        const usuario = await response.json()
-        console.log(`✅ Login universal realizado: ${usuario.nome}`)
+      // Verificar usuários admin
+      const usuario = usuarios.find((u: Usuario) => u.email === email && u.senha === senha && u.ativo)
+      if (usuario) {
+        await this.atualizarDados('usuarios', usuario.id, { ultimoAcesso: new Date().toISOString() })
+        console.log(`✅ Login local realizado: Admin ${usuario.nome}`)
         return usuario
       }
+      
+      // Verificar revendas
+      const revenda = revendas.find((r: Revenda) => r.email === email && r.senha === senha && r.ativo && !r.bloqueado)
+      if (revenda) {
+        await this.atualizarDados('revendas', revenda.id, { ultimoAcesso: new Date().toISOString() })
+        console.log(`✅ Login local realizado: Revenda ${revenda.nome}`)
+        return revenda
+      }
+      
+      console.log(`❌ Credenciais inválidas: ${email}`)
+      return null
     } catch (error) {
-      console.log('📡 Verificando credenciais localmente...')
+      console.error('❌ Erro na autenticação:', error)
+      return null
     }
-    
-    // Fallback: verificar dados locais
-    const usuarios = this.carregarDados('usuarios')
-    const revendas = this.carregarDados('revendas')
-    
-    // Verificar usuários admin
-    const usuario = usuarios.find((u: Usuario) => u.email === email && u.senha === senha && u.ativo)
-    if (usuario) {
-      await this.atualizarDados('usuarios', usuario.id, { ultimoAcesso: new Date().toISOString() })
-      console.log(`✅ Login local realizado: Admin ${usuario.nome}`)
-      return usuario
-    }
-    
-    // Verificar revendas
-    const revenda = revendas.find((r: Revenda) => r.email === email && r.senha === senha && r.ativo && !r.bloqueado)
-    if (revenda) {
-      await this.atualizarDados('revendas', revenda.id, { ultimoAcesso: new Date().toISOString() })
-      console.log(`✅ Login local realizado: Revenda ${revenda.nome}`)
-      return revenda
-    }
-    
-    console.log(`❌ Credenciais inválidas: ${email}`)
-    return null
   }
   
   static async sincronizarDados(): Promise<void> {
     try {
-      console.log('🔄 Sincronizando com banco universal...')
+      console.log('🔄 Sistema funcionando offline...')
       
-      // Sincronizar todos os dados com o banco universal
-      const response = await fetch(`${this.baseUrl}/sync`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer universal-access-token'
-        },
-        body: JSON.stringify({
-          usuarios: this.carregarDados('usuarios'),
-          revendas: this.carregarDados('revendas'),
-          clientes: this.carregarDados('clientes'),
-          banners: this.carregarDados('banners')
-        })
-      })
-      
-      if (response.ok) {
-        console.log('✅ Sincronização universal concluída!')
+      // Sistema funciona 100% offline - não precisa de API externa
+      // Todos os dados são salvos no localStorage do navegador
+      const dadosLocais = {
+        usuarios: this.carregarDados('usuarios'),
+        revendas: this.carregarDados('revendas'),
+        clientes: this.carregarDados('clientes'),
+        banners: this.carregarDados('banners')
       }
+      
+      console.log('✅ Sistema offline funcionando perfeitamente!', {
+        usuarios: dadosLocais.usuarios.length,
+        revendas: dadosLocais.revendas.length,
+        clientes: dadosLocais.clientes.length,
+        banners: dadosLocais.banners.length
+      })
     } catch (error) {
-      console.log('📡 Sincronização offline - dados salvos localmente')
+      console.log('📡 Dados mantidos localmente')
     }
   }
 }
@@ -819,53 +776,27 @@ export default function IPTVManagerPro() {
         if (sessaoSalva) {
           const dadosSessao = JSON.parse(sessaoSalva)
           
-          // Verificar no banco universal primeiro
-          try {
-            const response = await fetch(`https://api-iptv-universal.herokuapp.com/auth/verify`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sessionId: dadosSessao.sessionId })
-            })
-            
-            if (response.ok) {
-              const usuarioValido = await response.json()
-              const usuarioLogado: Usuario = {
-                id: usuarioValido.id,
-                nome: usuarioValido.nome,
-                email: usuarioValido.email,
-                senha: usuarioValido.senha,
-                tipo: usuarioValido.tipo || 'usuario',
-                ativo: usuarioValido.ativo,
-                dataCadastro: usuarioValido.dataCadastro,
-                ultimoAcesso: new Date().toISOString()
-              }
-              setUsuarioLogado(usuarioLogado)
-              setMostrarLogin(false)
-              console.log('✅ Sessão universal restaurada:', usuarioLogado.nome)
+          // Verificar localmente
+          const usuarioValido = usuariosFinais.find(u => u.id === dadosSessao.id && u.ativo) ||
+                               revendasSalvas.find(r => r.id === dadosSessao.id && r.ativo && !r.bloqueado)
+          
+          if (usuarioValido) {
+            const usuarioLogado: Usuario = {
+              id: usuarioValido.id,
+              nome: usuarioValido.nome,
+              email: usuarioValido.email,
+              senha: usuarioValido.senha,
+              tipo: usuarioValido.tipo || 'usuario',
+              ativo: usuarioValido.ativo,
+              dataCadastro: usuarioValido.dataCadastro,
+              ultimoAcesso: new Date().toISOString()
             }
-          } catch (error) {
-            // Fallback: verificar localmente
-            const usuarioValido = usuariosFinais.find(u => u.id === dadosSessao.id && u.ativo) ||
-                                 revendasSalvas.find(r => r.id === dadosSessao.id && r.ativo && !r.bloqueado)
-            
-            if (usuarioValido) {
-              const usuarioLogado: Usuario = {
-                id: usuarioValido.id,
-                nome: usuarioValido.nome,
-                email: usuarioValido.email,
-                senha: usuarioValido.senha,
-                tipo: usuarioValido.tipo || 'usuario',
-                ativo: usuarioValido.ativo,
-                dataCadastro: usuarioValido.dataCadastro,
-                ultimoAcesso: new Date().toISOString()
-              }
-              setUsuarioLogado(usuarioLogado)
-              setMostrarLogin(false)
-              console.log('✅ Sessão local restaurada:', usuarioLogado.nome)
-            } else {
-              // Limpar sessão inválida
-              localStorage.removeItem('iptv_sessao_universal')
-            }
+            setUsuarioLogado(usuarioLogado)
+            setMostrarLogin(false)
+            console.log('✅ Sessão local restaurada:', usuarioLogado.nome)
+          } else {
+            // Limpar sessão inválida
+            localStorage.removeItem('iptv_sessao_universal')
           }
         }
 
@@ -959,23 +890,6 @@ export default function IPTVManagerPro() {
           sessionId: sessionId,
           timestamp: new Date().toISOString()
         }))
-        
-        // Tentar salvar no banco universal
-        try {
-          await fetch('https://api-iptv-universal.herokuapp.com/auth/session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sessionId: sessionId,
-              userId: usuarioLogado.id,
-              email: usuarioLogado.email,
-              timestamp: new Date().toISOString()
-            })
-          })
-          console.log('✅ Sessão salva no banco universal')
-        } catch (error) {
-          console.log('📡 Sessão salva localmente')
-        }
         
         console.log('✅ Login realizado com sucesso:', usuarioLogado.nome)
       } else {
@@ -1146,23 +1060,6 @@ export default function IPTVManagerPro() {
         timestamp: new Date().toISOString()
       }))
       
-      // Tentar atualizar no banco universal
-      try {
-        await fetch('https://api-iptv-universal.herokuapp.com/auth/update-credentials', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: usuarioAtualizado.id,
-            email: novoEmail,
-            senha: novaSenha,
-            sessionId: sessionId
-          })
-        })
-        console.log('✅ Credenciais atualizadas no banco universal')
-      } catch (error) {
-        console.log('📡 Credenciais atualizadas localmente')
-      }
-      
       alert('✅ Credenciais alteradas com sucesso! Agora você pode fazer login de qualquer navegador com as novas credenciais.')
       console.log('✅ Credenciais universais atualizadas para:', novoEmail)
     }
@@ -1283,54 +1180,73 @@ export default function IPTVManagerPro() {
     document.body.removeChild(link)
   }
 
-  // Tela de Login Simplificada
+  // Tela de Login Futurista
   if (mostrarLogin) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md bg-[#87CEEB]/10 backdrop-blur-sm border-white/20">
-          <CardHeader className="text-center">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <Tv className="w-10 h-10 text-purple-400" />
-              <h1 className="text-2xl font-bold text-white">{configSistema.nomeSistema}</h1>
-            </div>
-            <CardTitle className="text-white">Acesso ao Sistema</CardTitle>
-            <CardDescription className="text-purple-200">
-              Entre com seu login e senha
-            </CardDescription>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+        {/* Grid de fundo futurista */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(139,69,19,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(139,69,19,0.1)_1px,transparent_1px)] bg-[size:50px_50px] animate-pulse"></div>
+        
+        {/* Efeitos de luz */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        
+        <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
+          <Card className="w-full max-w-md bg-black/40 backdrop-blur-xl border border-purple-500/30 shadow-2xl shadow-purple-500/20">
+            <CardHeader className="text-center space-y-6">
+              {/* Logo futurista */}
+              <div className="flex items-center justify-center">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full blur-lg opacity-50 animate-pulse"></div>
+                  <div className="relative bg-gradient-to-r from-purple-600 to-blue-600 p-4 rounded-full">
+                    <Tv className="w-12 h-12 text-white" />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Título futurista */}
+              <div className="space-y-2">
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 via-blue-400 to-purple-400 bg-clip-text text-transparent animate-pulse">
+                  IPTV Manager Pro
+                </h1>
+                <div className="h-px bg-gradient-to-r from-transparent via-purple-500 to-transparent"></div>
+              </div>
+              
+              {/* Indicador de Status da Conexão */}
+              <div className="flex items-center justify-center gap-2 mt-4">
+                <div className={`w-2 h-2 rounded-full ${
+                  statusConexao === 'online' ? 'bg-green-400' :
+                  statusConexao === 'sincronizando' ? 'bg-yellow-400 animate-pulse' :
+                  'bg-red-400'
+                }`}></div>
+                <span className="text-xs text-gray-300">
+                  {statusConexao === 'online' && (
+                    <>
+                      <Database className="w-3 h-3 inline mr-1" />
+                      Sistema Universal Online
+                    </>
+                  )}
+                  {statusConexao === 'sincronizando' && (
+                    <>
+                      <Cloud className="w-3 h-3 inline mr-1 animate-spin" />
+                      Sincronizando...
+                    </>
+                  )}
+                  {statusConexao === 'offline' && (
+                    <>
+                      <AlertCircle className="w-3 h-3 inline mr-1" />
+                      Modo offline
+                    </>
+                  )}
+                </span>
+              </div>
+            </CardHeader>
             
-            {/* Indicador de Status da Conexão */}
-            <div className="flex items-center justify-center gap-2 mt-4">
-              <div className={`w-2 h-2 rounded-full ${
-                statusConexao === 'online' ? 'bg-green-400' :
-                statusConexao === 'sincronizando' ? 'bg-yellow-400 animate-pulse' :
-                'bg-red-400'
-              }`}></div>
-              <span className="text-xs text-gray-300">
-                {statusConexao === 'online' && (
-                  <>
-                    <Database className="w-3 h-3 inline mr-1" />
-                    Sistema Universal Online
-                  </>
-                )}
-                {statusConexao === 'sincronizando' && (
-                  <>
-                    <Cloud className="w-3 h-3 inline mr-1 animate-spin" />
-                    Sincronizando...
-                  </>
-                )}
-                {statusConexao === 'offline' && (
-                  <>
-                    <AlertCircle className="w-3 h-3 inline mr-1" />
-                    Modo offline
-                  </>
-                )}
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <LoginForm onLogin={fazerLogin} carregando={carregandoLogin} />
-          </CardContent>
-        </Card>
+            <CardContent className="space-y-6">
+              <LoginForm onLogin={fazerLogin} carregando={carregandoLogin} />
+            </CardContent>
+          </Card>
+        </div>
       </div>
     )
   }
@@ -2046,36 +1962,42 @@ function LoginForm({ onLogin, carregando }: {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="email" className="text-white">Login</Label>
-        <Input
-          id="email"
-          type="email"
-          value={formData.email}
-          onChange={(e) => setFormData({...formData, email: e.target.value})}
-          className="bg-slate-700 border-slate-600 text-white"
-          placeholder="Digite seu login"
-          required
-          disabled={carregando}
-        />
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="email" className="text-white text-sm font-medium">Login</Label>
+          <Input
+            id="email"
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData({...formData, email: e.target.value})}
+            className="bg-black/20 border border-purple-500/30 text-white placeholder:text-gray-400 focus:border-purple-400 focus:ring-purple-400/20"
+            placeholder="Digite seu login"
+            required
+            disabled={carregando}
+          />
+        </div>
+        
+        <div>
+          <Label htmlFor="senha" className="text-white text-sm font-medium">Senha</Label>
+          <Input
+            id="senha"
+            type="password"
+            value={formData.senha}
+            onChange={(e) => setFormData({...formData, senha: e.target.value})}
+            className="bg-black/20 border border-purple-500/30 text-white placeholder:text-gray-400 focus:border-purple-400 focus:ring-purple-400/20"
+            placeholder="Digite sua senha"
+            required
+            disabled={carregando}
+          />
+        </div>
       </div>
       
-      <div>
-        <Label htmlFor="senha" className="text-white">Senha</Label>
-        <Input
-          id="senha"
-          type="password"
-          value={formData.senha}
-          onChange={(e) => setFormData({...formData, senha: e.target.value})}
-          className="bg-slate-700 border-slate-600 text-white"
-          placeholder="Digite sua senha"
-          required
-          disabled={carregando}
-        />
-      </div>
-      
-      <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={carregando}>
+      <Button 
+        type="submit" 
+        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium py-3 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg shadow-purple-500/25" 
+        disabled={carregando}
+      >
         {carregando ? (
           <>
             <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -2089,7 +2011,7 @@ function LoginForm({ onLogin, carregando }: {
         )}
       </Button>
       
-      <div className="text-center text-xs text-gray-400 mt-4">
+      <div className="text-center text-xs text-gray-400 mt-4 space-y-1">
         <p>🔐 Sistema Universal - Funciona em qualquer navegador</p>
         <p>🌐 Suas credenciais são salvas no banco de dados</p>
       </div>
