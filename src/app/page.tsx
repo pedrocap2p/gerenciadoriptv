@@ -197,29 +197,25 @@ class DatabaseAPI {
   }
   
   static async sincronizarDados(): Promise<void> {
-    try {
-      console.log('🔄 Sistema funcionando 100% offline - sem conexões externas')
-      
-      // Sistema funciona 100% offline - todos os dados são salvos localmente
-      const dadosLocais = {
-        usuarios: this.carregarDados('usuarios'),
-        revendas: this.carregarDados('revendas'),
-        clientes: this.carregarDados('clientes'),
-        banners: this.carregarDados('banners')
-      }
-      
-      console.log('✅ Sistema offline otimizado e funcionando perfeitamente!', {
-        usuarios: dadosLocais.usuarios.length,
-        revendas: dadosLocais.revendas.length,
-        clientes: dadosLocais.clientes.length,
-        banners: dadosLocais.banners.length
-      })
-      
-      // Confirmar que não há tentativas de conexão externa
-      console.log('🚀 Todas as operações são locais - sem erros de rede')
-    } catch (error) {
-      console.log('📱 Sistema mantido 100% local - funcionando perfeitamente')
+    // Sistema 100% offline - sem tentativas de conexão externa
+    console.log('🔄 Sistema offline ativo - dados salvos localmente')
+    
+    const dadosLocais = {
+      usuarios: this.carregarDados('usuarios'),
+      revendas: this.carregarDados('revendas'),
+      clientes: this.carregarDados('clientes'),
+      banners: this.carregarDados('banners')
     }
+    
+    console.log('✅ Sistema offline funcionando perfeitamente!', {
+      usuarios: dadosLocais.usuarios.length,
+      revendas: dadosLocais.revendas.length,
+      clientes: dadosLocais.clientes.length,
+      banners: dadosLocais.banners.length
+    })
+    
+    // Confirmar operação local sem erros de rede
+    console.log('🚀 Operação 100% local concluída com sucesso')
   }
 }
 
